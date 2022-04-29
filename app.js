@@ -1,9 +1,10 @@
-import express from "express";
 import chalk from "chalk";
 import cors from "cors";
 import dayjs from "dayjs";
-import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
+import express from "express";
+import joi from "joi";
+import { MongoClient } from "mongodb";
 
 dotenv.config();
 
@@ -61,69 +62,98 @@ app.get("/messages", async (req, res) => {
 });
 
 app.post("/participants", async (req, res) => {
-    const { name } = req.body;
-    await mongoClient.connect();
+    const schema = joi.object({
+        name: joi.string().required()
+    });
 
-    let participant = await db
-        .collection("participants")
-        .findOne({ name: name });
+    const validation = schema.validate(req.body);
 
-    // await mongoClient.close();
-    if (participant) {
-        res.sendStatus(409);
-    } else {
-        participant = {
-            name,
-            lastStatus: Date.now(),
-        };
+    if(validation.error) {
+        console.log(validation.error.details);
+        res.sendStatus(422);
+    } else{
+        const { name } = req.body;
 
-        try {
-            // await mongoClient.connect();
-            await db.collection("participants").insertOne(participant);
-
-            const message = {
-                from: name,
-                to: "Todos",
-                text: "entra na sala...",
-                type: "status",
-                time: dayjs().format("HH:mm:ss"),
+        await mongoClient.connect();
+    
+        let participant = await db
+            .collection("participants")
+            .findOne({ name: name });
+    
+        // await mongoClient.close();
+        if (participant) {
+            res.sendStatus(409);
+        } else {
+            participant = {
+                name,
+                lastStatus: Date.now(),
             };
-
-            await db.collection("messages").insertOne(message);
-
-            // mongoClient.close();
-
-            res.sendStatus(201);
-        } catch (error) {
-            res.sendStatus(500);
-            // mongoClient.close();
+    
+            try {
+                // await mongoClient.connect();
+                await db.collection("participants").insertOne(participant);
+    
+                const message = {
+                    from: name,
+                    to: "Todos",
+                    text: "entra na sala...",
+                    type: "status",
+                    time: dayjs().format("HH:mm:ss"),
+                };
+    
+                await db.collection("messages").insertOne(message);
+    
+                // mongoClient.close();
+    
+                res.sendStatus(201);
+            } catch (error) {
+                res.sendStatus(500);
+                // mongoClient.close();
+            }
         }
     }
+
 });
 
 app.post("/messages", async (req, res) => {
-    const { to, text, type } = req.body;
-    const from = req.headers.user;
+    const schema = joi.object({
+        to: joi.string().required(),
+        text: joi.string().required(),
+        type: joi.any().valid("message", "private_message")
+    });
 
-    const message = {
-        to,
-        from,
-        text,
-        type,
-        time: dayjs().format("HH:mm:ss"),
-    };
+    const validation = schema.validate(req.body);
 
-    try {
-        // await mongoClient.connect();
+    const user = await db.collection("participants").findOne({name: req.headers.user});
 
-        await db.collection("messages").insertOne(message);
-
-        res.sendStatus(201);
-
-        // mongoClient.close();
-    } catch (e) {
-        res.sendStatus(500);
+    if(!user || validation.error) {
+        console.log(validation.error.details);
+        res.sendStatus(422);
+    } else{
+        const { to, text, type } = req.body;
+        const from = req.headers.user;
+    
+        const message = {
+            to,
+            from,
+            text,
+            type,
+            time: dayjs().format("HH:mm:ss"),
+        };
+    
+        try {
+            // await mongoClient.connect();
+    
+            await db.collection("messages").insertOne(message);
+    
+            res.sendStatus(201);
+    
+            // mongoClient.close();
+        } catch (e) {
+            res.sendStatus(500);
+        } 
     }
+
 });
 
 app.post("/status", async (req, res) => {
