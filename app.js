@@ -118,8 +118,22 @@ app.post("/messages", async (req, res) => {
     }
 });
 
-app.post("/status", (req, res) => {
-    res.sendStatus(201);
+app.post("/status", async (req, res) => {
+    const name = req.headers.user;
+
+    let participant = await db.collection("participants").findOne({ name: name });
+    if(!participant){
+        res.sendStatus(404);
+    } else{
+        try{
+            db.collection("participants").updateOne(participant, {$set: {lastStatus: Date.now()}});
+
+            res.sendStatus(200);
+        } catch{
+            res.sendStatus(500);
+        }
+    }
+
 });
 
 app.listen(5000, () =>
