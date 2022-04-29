@@ -36,10 +36,16 @@ app.get("/participants", async (req, res) => {
 });
 
 app.get("/messages", async (req, res) => {
+    const limit = req.query.limit;
+
     try {
         // await mongoClient.connect();
 
-        const messages = await db.collection("messages").find().toArray();
+        let messages = await db.collection("messages").find().toArray();
+        if(limit && limit <= messages.length){
+            messages = messages.slice((limit * -1));
+        }
+        
         res.send(messages);
 
         // mongoClient.close();
@@ -142,7 +148,7 @@ app.listen(5000, () =>
     console.log(chalk.green("Server listening on port 5000"))
 );
 
-async function checkActiveParticipants() {
+async function removeInactiveParticipants() {
     try {
         const participants = await db.collection("participants").find({})
             .toArray();
@@ -163,4 +169,4 @@ async function checkActiveParticipants() {
     }
 }
 
-const intervalo = setInterval(checkActiveParticipants, 15000);
+const intervalo = setInterval(removeInactiveParticipants, 15000);
