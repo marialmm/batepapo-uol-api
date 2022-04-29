@@ -18,7 +18,7 @@ app.use(cors());
 
 app.get("/participants", async (req, res) => {
     try {
-        await mongoClient.connect();
+        // await mongoClient.connect();
 
         const participants = await db
             .collection("participants")
@@ -26,18 +26,18 @@ app.get("/participants", async (req, res) => {
             .toArray();
         res.send(participants);
 
-        mongoClient.close();
+        // mongoClient.close();
     } catch (error) {
         console.log(error);
         res.sendStatus(500);
 
-        mongoClient.close();
+        // mongoClient.close();
     }
 });
 
 app.get("/messages", async (req, res) => {
     try {
-        await mongoClient.connect();
+        // await mongoClient.connect();
 
         const messages = await db
             .collection("messages")
@@ -45,12 +45,12 @@ app.get("/messages", async (req, res) => {
             .toArray();
         res.send(messages);
 
-        mongoClient.close();
+        // mongoClient.close();
     } catch (error) {
         console.log(error);
         res.sendStatus(500);
 
-        mongoClient.close();
+        // mongoClient.close();
     }
 });
 
@@ -60,7 +60,7 @@ app.post("/participants", async (req, res) => {
 
     let participant = await db.collection("participants").findOne({ name: name });
 
-    await mongoClient.close();
+    // await mongoClient.close();
     if (participant) {
         res.sendStatus(409);
     } else {
@@ -70,7 +70,7 @@ app.post("/participants", async (req, res) => {
         };
 
         try {
-            await mongoClient.connect();
+            // await mongoClient.connect();
             await db.collection("participants").insertOne(participant);
 
             const message = {
@@ -83,18 +83,39 @@ app.post("/participants", async (req, res) => {
 
             await db.collection("messages").insertOne(message);
 
-            mongoClient.close();
+            // mongoClient.close();
 
             res.sendStatus(201);
         } catch (error) {
             res.sendStatus(500);
-            mongoClient.close();
+            // mongoClient.close();
         }
     }
 });
 
-app.post("/messages", (req, res) => {
-    res.sendStatus(201);
+app.post("/messages", async (req, res) => {
+    const {to, text, type} = req.body;
+    const from = req.headers.user;
+
+    const message = {
+        to,
+        from,
+        text,
+        type,
+        time: dayjs().format("HH:mm:ss")
+    }
+
+    try{
+        // await mongoClient.connect();
+
+        await db.collection("messages").insertOne(message);
+
+        res.sendStatus(201);
+
+        // mongoClient.close();
+    } catch (e){
+        res.sendStatus(500);
+    }
 });
 
 app.post("/status", (req, res) => {
