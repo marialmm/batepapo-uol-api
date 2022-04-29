@@ -37,11 +37,14 @@ app.get("/participants", async (req, res) => {
 
 app.get("/messages", async (req, res) => {
     const limit = req.query.limit;
+    const user = req.headers.user;
 
     try {
         // await mongoClient.connect();
 
-        let messages = await db.collection("messages").find().toArray();
+        let messages = await db.collection("messages").find({
+            $or: [{type: "message"}, {to: "Todos"}, {to: user}, {from: user}]
+        }).toArray();
         if(limit && limit <= messages.length){
             messages = messages.slice((limit * -1));
         }
