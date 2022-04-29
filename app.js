@@ -39,10 +39,7 @@ app.get("/messages", async (req, res) => {
     try {
         // await mongoClient.connect();
 
-        const messages = await db
-            .collection("messages")
-            .find()
-            .toArray();
+        const messages = await db.collection("messages").find().toArray();
         res.send(messages);
 
         // mongoClient.close();
@@ -58,7 +55,9 @@ app.post("/participants", async (req, res) => {
     const { name } = req.body;
     await mongoClient.connect();
 
-    let participant = await db.collection("participants").findOne({ name: name });
+    let participant = await db
+        .collection("participants")
+        .findOne({ name: name });
 
     // await mongoClient.close();
     if (participant) {
@@ -94,7 +93,7 @@ app.post("/participants", async (req, res) => {
 });
 
 app.post("/messages", async (req, res) => {
-    const {to, text, type} = req.body;
+    const { to, text, type } = req.body;
     const from = req.headers.user;
 
     const message = {
@@ -102,10 +101,10 @@ app.post("/messages", async (req, res) => {
         from,
         text,
         type,
-        time: dayjs().format("HH:mm:ss")
-    }
+        time: dayjs().format("HH:mm:ss"),
+    };
 
-    try{
+    try {
         // await mongoClient.connect();
 
         await db.collection("messages").insertOne(message);
@@ -113,7 +112,7 @@ app.post("/messages", async (req, res) => {
         res.sendStatus(201);
 
         // mongoClient.close();
-    } catch (e){
+    } catch (e) {
         res.sendStatus(500);
     }
 });
@@ -121,21 +120,47 @@ app.post("/messages", async (req, res) => {
 app.post("/status", async (req, res) => {
     const name = req.headers.user;
 
-    let participant = await db.collection("participants").findOne({ name: name });
-    if(!participant){
+    let participant = await db
+        .collection("participants")
+        .findOne({ name: name });
+    if (!participant) {
         res.sendStatus(404);
-    } else{
-        try{
-            db.collection("participants").updateOne(participant, {$set: {lastStatus: Date.now()}});
+    } else {
+        try {
+            db.collection("participants").updateOne(participant, {
+                $set: { lastStatus: Date.now() },
+            });
 
             res.sendStatus(200);
-        } catch{
+        } catch {
             res.sendStatus(500);
         }
     }
-
 });
 
 app.listen(5000, () =>
     console.log(chalk.green("Server listening on port 5000"))
 );
+
+async function checkActiveParticipants() {
+    try {
+        const participants = await db.collection("participants").find({})
+            .toArray();
+        for (let i = 0; i < participants.length; i++) {
+            if (Date.now() - participants[i].lastStatus > 10000) {
+                await db.collection("participants").deleteOne(participants[i]);
+                await db.collection("messages").insertOne({
+                    from: participants[i].name,
+                    to: "Todos",
+                    text: "sai da sala...",
+                    type: "status",
+                    time: dayjs().format("HH:mm:ss"),
+                });
+            }
+        }
+    } catch (error) {
+        console.log(chalk.red(error));
+    }
+}
+
+const intervalo = setInterval(checkActiveParticipants, 15000);
