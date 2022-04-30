@@ -4,7 +4,7 @@ import dayjs from "dayjs";
 import dotenv from "dotenv";
 import express from "express";
 import joi from "joi";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 
 dotenv.config();
 
@@ -19,20 +19,14 @@ app.use(cors());
 
 app.get("/participants", async (req, res) => {
     try {
-        // await mongoClient.connect();
-
         const participants = await db
             .collection("participants")
             .find()
             .toArray();
         res.send(participants);
-
-        // mongoClient.close();
     } catch (error) {
         console.log(error);
         res.sendStatus(500);
-
-        // mongoClient.close();
     }
 });
 
@@ -41,8 +35,6 @@ app.get("/messages", async (req, res) => {
     const user = req.headers.user;
 
     try {
-        // await mongoClient.connect();
-
         let messages = await db.collection("messages").find({
             $or: [{type: "message"}, {to: "Todos"}, {to: user}, {from: user}]
         }).toArray();
@@ -51,22 +43,18 @@ app.get("/messages", async (req, res) => {
         }
         
         res.send(messages);
-
-        // mongoClient.close();
     } catch (error) {
         console.log(error);
         res.sendStatus(500);
-
-        // mongoClient.close();
     }
 });
 
 app.post("/participants", async (req, res) => {
-    const schema = joi.object({
+    const participantSchema = joi.object({
         name: joi.string().required()
     });
 
-    const validation = schema.validate(req.body);
+    const validation = participantSchema.validate(req.body);
 
     if(validation.error) {
         console.log(validation.error.details);
@@ -79,8 +67,6 @@ app.post("/participants", async (req, res) => {
         let participant = await db
             .collection("participants")
             .findOne({ name: name });
-    
-        // await mongoClient.close();
         if (participant) {
             res.sendStatus(409);
         } else {
@@ -90,7 +76,6 @@ app.post("/participants", async (req, res) => {
             };
     
             try {
-                // await mongoClient.connect();
                 await db.collection("participants").insertOne(participant);
     
                 const message = {
@@ -103,12 +88,9 @@ app.post("/participants", async (req, res) => {
     
                 await db.collection("messages").insertOne(message);
     
-                // mongoClient.close();
-    
                 res.sendStatus(201);
             } catch (error) {
                 res.sendStatus(500);
-                // mongoClient.close();
             }
         }
     }
@@ -116,13 +98,13 @@ app.post("/participants", async (req, res) => {
 });
 
 app.post("/messages", async (req, res) => {
-    const schema = joi.object({
+    const messageSchema = joi.object({
         to: joi.string().required(),
         text: joi.string().required(),
         type: joi.any().valid("message", "private_message")
     });
 
-    const validation = schema.validate(req.body);
+    const validation = messageSchema.validate(req.body);
 
     const user = await db.collection("participants").findOne({name: req.headers.user});
 
@@ -142,13 +124,9 @@ app.post("/messages", async (req, res) => {
         };
     
         try {
-            // await mongoClient.connect();
-    
             await db.collection("messages").insertOne(message);
     
             res.sendStatus(201);
-    
-            // mongoClient.close();
         } catch (e) {
             res.sendStatus(500);
         } 
@@ -176,6 +154,30 @@ app.post("/status", async (req, res) => {
         }
     }
 });
+
+app.delete("/messages/:idMessage", async (req, res) => {
+    const idMessage = req.params.idMessage;
+    const user = req.headers.user;
+
+    try{
+        const message = await db.collection("messages").findOne({_id: new ObjectId(idMessage)});
+        console.log(message)
+        if(!message){
+            res.sendStatus(404);
+            return;
+        } else if(message.from !== user){
+            res.sendStatus(401);
+            return;
+        }
+
+        await db.collection("messages").deleteOne(message);
+
+        res.sendStatus(200);
+    } catch (e){
+        console.log(e);
+        res.sendStatus(500);
+    }
+})
 
 app.listen(5000, () =>
     console.log(chalk.green("Server listening on port 5000"))
